@@ -1,0 +1,33 @@
+\documentclass[blue,normal,cn]{elegantbook}
+
+\title{Sirius 设计文档}
+\version{0.01}
+\date{\today}
+
+\begin{document}
+
+\tableofcontents
+\mainmatter
+
+\chapter{设计概述}
+
+比赛的核心要求是实现一个部分兼容 MIPS32 体系结构的小端序 CPU。为了保证
+系统的简洁性，我们的 CPU 实现了最常用的部分 MIPS32 指令以及运行操作系统
+等高级应用所必须的协处理器 CP0 等特权资源。
+
+我们实现的处理器采用了\textbf{双发射}五级流水线的设计，并支持一级指令、数据
+缓存，以提升系统性能。一级缓存目前采用直接映射的方式，行宽 64 字节，大小为 8 KB。
+
+通过运行功能测试以及性能测试，我们一定程度上证明了该处理器的正确性。
+
+\section{指令系统}
+
+\section{内存管理}
+
+\section{缓存}
+
+\section{异常处理}
+
+\section{CP0}
+
+\end{document}
