@@ -8,12 +8,40 @@
 \usepackage{xcolor} 
 \usepackage{xfrac}
 \usepackage{tikz}
+\usepackage{titling}
+\renewcommand\maketitlehooka{\null\mbox{}\vfill}
+\renewcommand\maketitlehookd{\vfill\null}
 
 \title{Sirius 设计文档}
 \version{0.01}
 \date{\today}
+\author{name1e5s}
+
+\makeatletter
+\let\thetitle\@title
+\let\theauthor\@author
+\let\thedate\@date
+\makeatother
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\theauthor}
+\lhead{\thetitle}
+\cfoot{\thepage}
 
 \begin{document}
+
+\begin{titlepage}
+    \vspace*{\fill}
+    \begin{center}
+        \rule{\linewidth}{0.2 mm} \\[0.4 cm]
+        { \huge \bfseries \thetitle}\\
+        \rule{\linewidth}{0.2 mm} \\[1.5 cm]
+        \vspace*{2cm}
+        \includegraphics[scale = 0.618]{logo.jpg}\\[1.0 cm]
+    \end{center}
+    \vspace*{\fill}
+\end{titlepage}
 
 \tableofcontents
 \mainmatter
@@ -24,14 +52,15 @@
 为了保证系统的简洁性，我们的 CPU 实现了最常用的部分 MIPS32 指令以及运行操作系统
 等高级应用所必须的协处理器 CP0 等特权资源。
 
-我们实现的处理器命名为 Sirius，采用了\textbf{双发射}五级流水线的设计，并支持一级指令、数据
+我们实现的处理器命名为 Sirius，采用了\textbf{双发射}五级流水线的设计\cite{Patterson:2013:COD:2568134}，并支持一级指令、数据
 缓存，以提升系统性能。一级缓存目前采用直接映射的方式，行宽 64 字节，大小为 8 KB。
 
 通过运行功能测试以及性能测试，我们一定程度上证明了该处理器的正确性。
 
 \section{指令系统}
 
-根据大赛要求，我们实现的指令系统为 MIPS32 指令系统的子集，准确的说，我们
+根据大赛要求，我们实现的指令系统为 MIPS32\cite{MIPS1A}\cite{MIPS2A} 
+\cite{MIPS3} 指令系统的子集，准确的说，我们
 实现的指令系统包含全部 MIPS I 中的非浮点部分以及 MIPS32 中为了实现从异常
 返回而添加的 ERET 指令。该指令系统包含以下几种指令类型：
 
@@ -137,6 +166,13 @@ Sirius CPU 的流水线设计图见图~\ref{fig:SiriusPipeline}~。需要注意�
 CPU 部分的 RTL 代码使用 SyetemVerilog写就，核心代码除了乘除法部分
 为了减少资源占用提升性能使用了 Xilinx 的 IP 核外，均为独立完成。代码
 存放于 \href{https://github.com/name1e5s/Sirius}{GitHub} 中（暂未公开）。
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=1.64\textwidth,angle=90]{figures/Sirius.pdf}
+    \caption{Sirius 流水线设计简图}
+    \label{fig:SiriusPipeline}
+\end{figure}
 
 \section{接口定义}
 
@@ -546,14 +582,6 @@ HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段
 写回阶段是 Sirius 流水线的最后一个阶段，在该阶段进行的主要是向寄存器文件
 以及 HiLo 寄存器写入结果。不再赘述。
 
-\appendix
-\chapter{Sirius 流水线简图}
-
-\begin{figure}[htpb]
-    \centering
-    \includegraphics[width=1.25\textwidth,angle=90]{figures/Sirius.pdf}
-    \caption{Sirius 流水线设计简图}
-    \label{fig:SiriusPipeline}
-\end{figure}
+\bibliography{DesignReportRef}
 
 \end{document}
