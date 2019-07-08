@@ -456,6 +456,96 @@ PC 在初始化时被置为 0xBFC0\_0000。
     \label{tab:BranchUnitInterface}
 \end{table}
 
+\subsection{ALU}
+
+ALU 是整个执行阶段，乃至整个 CPU 中最重要的模块之一。Sirius 内置了两个
+ALU，分别用于主辅流水线。在这里我们主要介绍在主流水线上使用的 ALU，即 ALU $\alpha$，
+用于辅流水线上的 ALU $\beta$ 为 ALU $\alpha$ 取出乘除法以及特权指令后得来的。
+不再详细介绍。
+
+ALU $\alpha$ 的代码位于 \href{https://github.com/name1e5s/Sirius/blob/master/alu\_alpha.sv}{\textbf{alu\_alpha.sv}},
+其接口定义见表~\ref{tab:ALUAlphaInterface}~。
+
+对于大多数比较简单的算术逻辑指令，我们直接通过调用 SystemVerilog 内置的
+运算符号即可完成，但是对于乘、除法这种操作而言，直接调用运算符进行计算必然
+会导致执行周期的周期过长，无法有效地提升主频。因此我们在这里使用 Xilinx\textsuperscript{\textregistered}
+提供的 IP 核调用对应的片上资源进行运算，并辅以计数器以及运算前/后的求补器完成
+各种有符号/无符号乘法运算。
+
+当 ALU 执行过程中出现异常时，对应的 ``exp\_*'' 信号会被置为 1，并随着流水线
+进入到下一层级，并在下一层级统一处理。
+
+\begin{table}
+    \renewcommand\arraystretch{1.25}
+    \centering
+    \begin{tabular}{cccm{.55\textwidth}}
+        \toprule 
+        \rowcolor{black!20} \textbf{Signal Name} & \textbf{Width} & \textbf{Direction} & \textbf{Description} \\
+        \midrule
+        clk & 1 & Input & 时钟信号\\
+        rst & 1 & Input & 复位信号\\
+        flush\_i & 1 &Input & 流水线刷新信号\\
+        \\
+        alu\_op & 5...0 & Input & ALU 操作码\\
+        src\_a & 31...0 & Input & 源操作数 1\\
+        src\_b & 31...0 & Input & 源操作数 2\\
+        src\_hilo & 63...0 & Input & HiLo 寄存器的值\\
+        \\
+        rd & 4...0 & Input & rd 地址\\
+        sel & 2...0 & Input & sel 内容\\
+        cop0\_addr & 7...0 & Output & 如果该指令为 MFC0，该
+        信号指示从 CP0 中读取什么结果\\
+        cop0\_data & 31...0 & Input & 从 CP0 中读到的结果\\
+        cop0\_wen & 1 & Output & CP0 写使能\\
+        exp\_overflow & 1 & Output & 是否发生了溢出异常\\
+        exp\_eret & 1 & Output & 是否正在执行 ERET 指令\\
+        exp\_syscal & 1 & Output & 是否正在执行 ERET 指令\\
+        exp\_break & 1 & Output & 是否正在执行 break 指令\\
+        \\
+        hilo\_wen & 1 & Output & HiLo 寄存器写使能\\
+        hilo\_result & 63...0 & Output & HiLo 寄存器输出结果\\
+        result & 31...0 & Output & 运算结果\\
+        stall\_o & 1 & Output & 流水线是否需要暂停\\
+        \bottomrule
+    \end{tabular}
+    \caption{ALU $\alpha$ 接口定义}
+    \label{tab:ALUAlphaInterface}
+\end{table}
+
+\subsection{HiLo 寄存器}
+
+HiLo 寄存器对外表现为一对寄存器，即 Hi、Lo 两个 32 位的寄存器。在我们的
+实现内，Hi、Lo 寄存器被作为一个整体实现，即实现为一个 64 位的寄存器。Hi 寄存器
+为这一寄存器的高 32 位，Lo 寄存器位该寄存器的低 32 位的寄存器。
+
+HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段以及写回阶段还未写入到
+寄存器内部的数值也可以被前推到执行阶段需要访问 HiLo 寄存器时候获得。
+
+\section{访存阶段}
+
+访存阶段主要负责访问存储器、处理异常。
+
+访存阶段在获取执行阶段送来的访存信号以及地址信息后，根据这些信息向 MMU 发出对应
+的请求。因为内存访问通常是按字对齐的，但是 MIPS 除了支持 LW、SW 等直接
+操作整个字的指令外，还需要支持 LH、SH、LB、SB 等操作半字乃至字节的指令
+甚至是一直作为 MIPS 特色的 LWL、SWL 等非对其访问指令。为了支持这些指令，
+访存单元在获取所需信号后会将操作转换为 (操作类型，字节使能，操作地址，写数据(如果有)) 的
+一个四元组，并发送到 MMU 中，MMU 再根据情况决定是对 Data Cache 进行
+操作还是开始动用 AXI 总线访问外部设备。
+
+在进行实际的访存指令之前，异常模块会先行检查是否存在异常，如果存在异常则
+取消当前的指令并把对应的 PC 值按照 MIPS 的规范放入 CP0 的 EPC 寄存器内，
+同时设置好处理异常所需的各个 CP0 寄存器。中断作为特殊的异常也会在此被处理，
+异常处理逻辑内存在对应的逻辑来处理异常可能会打断正常的流水线执行等问题。
+
+辅流水线在访存阶段什么都不做，仅仅是在未发生异常的情况下直接将所需信号
+传送到下一流水级等待处理。
+
+\section{写回阶段}
+
+写回阶段是 Sirius 流水线的最后一个阶段，在该阶段进行的主要是向寄存器文件
+以及 HiLo 寄存器写入结果。不再赘述。
+
 \appendix
 \chapter{Sirius 流水线简图}
 
