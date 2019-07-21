@@ -9,6 +9,7 @@
 \usepackage{xfrac}
 \usepackage{tikz}
 \usepackage{titling}
+\usepackage{bytefield}
 \renewcommand\maketitlehooka{\null\mbox{}\vfill}
 \renewcommand\maketitlehookd{\vfill\null}
 
@@ -83,8 +84,8 @@
 
 \section{内存管理}
 
-处理器的 MMU（内存管理）模块负责将虚地址映射为对应的物理地址，我们的 CPU 目前
-只实现了 MIPS32r1 规范中规定的 kseg0 以及 kseg1 两段内存地址的映射，这两部分
+处理器的访存模块负责将虚地址映射为对应的物理地址，我们的 CPU 目前
+只实现了 MIPS32 规范中规定的 kseg0 以及 kseg1 两段内存地址的映射，这两部分
 的映射方式很简单。仅仅将物理地址的高三位置为 0 即可。后续的版本会实现完整的内存
 地址映射。
 
@@ -97,8 +98,8 @@
 我们实现的 L1 Cache 共分为两部分：L1 指令缓存以及 L1 数据缓存。两者配置
 完全相同，大小为 8 KB，行宽 64 字节，采用直接映射的方式进行替换。当命中时
 L1 Cache 可以在单周期内返回数据，否则就会暂停流水线与内存设备进行交互。
-L1 Cache 与 MMU 结合在一起，对外采用 AXI 接口，支持猝发(Burst)传输，
-一次传输请求可以处理一整行缓存数据，以此提高总线的利用率。
+L1 Cache 对外采用 AXI 接口，支持猝发(Burst)传输，
+一次传输请求可以处理 64 字节的数据，以此提高总线的利用率。
 
 \section{异常处理}
 
@@ -124,17 +125,14 @@ L1 Cache 与 MMU 结合在一起，对外采用 AXI 接口，支持猝发(Burst)
 
 \section{CP0}
 
-CP0 本质上为一组寄存器。Sirius 实现了大赛文档要求的全部 CP0 寄存器。同时
-为了支撑后续的操作系统实现，我们拟额外实现一些 MIPS32r1 规范中要求的寄存器。
-详见附录。
+Sirius 实现了大赛文档要求的全部 CP0 寄存器。后续会补全支持 Linux 启动所必需的寄存器。
 
-\chapter{Sirius CPU}
+\chapter{CPU}
 
 \section{总体设计}
 
 Sirius CPU 设计为双发射五级流水线，分为取指、解码、执行、访存以及写回五个
-流水级。在取指阶段，PC 中的值被送往 MMU，并在 MMU 被翻译为对应的物理地址，
-并被送往 MMU 中取指相关的部分。如果该虚地址所在的区域可以被缓存，MMU 会先
+流水级。在取指阶段，PC 中的值被送往访存单元。如果该虚地址所在的区域可以被缓存，访存单元会先
 在内置的 L1 指令缓存内查询该指令。如果缓存命中则在单周期内返回指令数据，否则
 会发起访存请求充填流水线并暂停处理器。如果虚地址所在的区域不可被缓存，则直接
 发起访存请求并暂停流水线直到数据返回。取到的指令以及与之对应的 PC 地址会被送到
@@ -145,15 +143,13 @@ Sirius CPU 设计为双发射五级流水线，分为取指、解码、执行、
 跳转等指令也在此执行，一旦确定需要跳转，需要跳转到的地址会被送回到 PC，PC 会在
 下一周期更新到目的地址。执行阶段产生的结果会被送往访存阶段，在访存阶段首先会
 处理异常，一旦有异常发生则刷新流水线。如果没有任何异常产生则正常进行访存操作。
-访存操作会将数据以及地址等控制信息发送到 MMU 内，MMU 依然负责虚拟地址转换，
+访存操作会将数据以及地址等控制信息发送到访存单元内，访存单元依然负责虚拟地址转换，
 L1 数据缓存查找等操作。访存阶段的结果会被送到写回阶段。在写回阶段，运算/访存
 结果被写入寄存器中。
 
 为了处理数据冲突问题，我们的处理器引入了旁路机制，各个阶段的运行结果都会被前推
 到解码阶段。当通过前推无法解决数据冲突时(如 load-use 冲突)，流水线会暂停一拍
-等待结果返回。对于跳转指令导致的控制冲突，我们使用 MIPS 的延迟槽机制尽可能的
-使流水线不中断。在后续还将考虑引入分支预测器以及循环缓冲区进一步保证指令流不被
-打断。
+等待结果返回。
 
 为了遵循 MIPS32r1 的规范，Sirius CPU 实现了精确异常处理。其实现方法是当异常
 发生时，不直接处理，而是将之保存在流水线的寄存器内，直到访存阶段时统一处理。一旦
@@ -165,7 +161,7 @@ Sirius CPU 的流水线设计图见图~\ref{fig:SiriusPipeline}~。需要注意�
 
 CPU 部分的 RTL 代码使用 SyetemVerilog写就，核心代码除了乘除法部分
 为了减少资源占用提升性能使用了 Xilinx 的 IP 核外，均为独立完成。代码
-存放于 \href{https://github.com/name1e5s/Sirius}{GitHub} 中（暂未公开）。
+存放于 \href{https://github.com/name1e5s/Sirius}{GitHub} 中。
 
 \begin{figure}[htpb]
     \centering
@@ -178,9 +174,9 @@ CPU 部分的 RTL 代码使用 SyetemVerilog写就，核心代码除了乘除法
 
 Sirius 对外接口为标准的 AXI 接口。详见 ARM 的规范。
 
-Sirius 内部主要分为两部分，MMU 以及核心部分，核心部分的接口如
+Sirius 内部主要分为两部分，即访存单元以及核心部分，核心部分的接口如
 表~\ref{tab:SiriusCoreInterface}~所示。其中 ``inst\_*'' 与 ``data\_*''
-信号是与 MMU 连接的信号，MMU 则视情况使用 AXI 的接口对外部设备发起访问请求。
+信号是与访存单元连接的信号，访存单元则视情况使用 AXI 接口对外部设备发起访问请求。
 
 当需要进行访存时，Sirius 会把对应的使能信号置为 1 ，同时在地址信号内给出需要
 访存的地址。如果数据可用，则对应的 ``*\_ok'' 信号会被置为 1，如果对应数据不可用，
@@ -284,7 +280,7 @@ PC 在初始化时被置为 0xBFC0\_0000。
 部分就是一个用于存储指令的环形缓冲区以及分别用于读写缓冲区的指针。在我们的实现中
 为了支持双发射相关的逻辑，我们拓展了读写指针，使得该指令 FIFO 最多可以同时
 读取和存储两条指令。同时为了支撑 MIPS 要求的延迟槽机制的正确运行，该 FIFO 还有
-还实现有一段区域用于在因分支指令清空 FIFO 时暂存本应位于延迟槽内的指令。
+还实现有一段区域用于在因分支指令清空 FIFO 时暂存延迟槽内的指令。
 
 \begin{figure}[htpb]
     \centering
@@ -295,9 +291,9 @@ PC 在初始化时被置为 0xBFC0\_0000。
             \draw (\angle:1) -- (\angle-180:1);
         \node [circle,thick,fill=white,draw=black,align=center,minimum size=3cm] at (0,0) {Instruction FIFO \\ Buffer};
         \draw [<-] (56.25:1) -- (56.25:1.25) -- +(.333,0)
-            node [right,inner xsep=.333cm] (Head) {Head (extract)};
+            node [right,inner xsep=.333cm] (Head) {Head (read)};
         \draw [<-] (-33.75:1) -- (-33.75:1.25) -- +(.333,0)
-            node [right,inner xsep=.333cm] (Tail) {Tail (insert)};
+            node [right,inner xsep=.333cm] (Tail) {Tail (write)};
         \draw [->,shorten >=5pt,shorten <=5pt] (Tail.west) to [bend right] 
             node [midway,sloped,above,allow upside down] {\footnotesize 4\,units in FIFO}
         (Head.west);
@@ -561,13 +557,13 @@ HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段
 
 访存阶段主要负责访问存储器、处理异常。
 
-访存阶段在获取执行阶段送来的访存信号以及地址信息后，根据这些信息向 MMU 发出对应
+访存阶段在获取执行阶段送来的访存信号以及地址信息后，根据这些信息向访存单元发出对应
 的请求。因为内存访问通常是按字对齐的，但是 MIPS 除了支持 LW、SW 等直接
 操作整个字的指令外，还需要支持 LH、SH、LB、SB 等操作半字乃至字节的指令
 甚至是一直作为 MIPS 特色的 LWL、SWL 等非对其访问指令。为了支持这些指令，
 访存单元在获取所需信号后会将操作转换为 (操作类型，字节使能，操作地址，写数据(如果有)) 的
-一个四元组，并发送到 MMU 中，MMU 再根据情况决定是对 Data Cache 进行
-操作还是开始动用 AXI 总线访问外部设备。
+一个四元组，并发送到访存单元中，访存单元再根据情况决定是对 Data Cache 进行
+操作还是动用 AXI 总线访问外部设备。
 
 在进行实际的访存指令之前，异常模块会先行检查是否存在异常，如果存在异常则
 取消当前的指令并把对应的 PC 值按照 MIPS 的规范放入 CP0 的 EPC 寄存器内，
@@ -581,6 +577,59 @@ HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段
 
 写回阶段是 Sirius 流水线的最后一个阶段，在该阶段进行的主要是向寄存器文件
 以及 HiLo 寄存器写入结果。不再赘述。
+
+\chapter{访存单元}
+
+访存单元主要包含两部分：用于虚实地址转换的 MMU 以及用于加速内存访问的 L1 Cache。
+
+\section{MMU}
+MIPS 中的虚实地址转换由 MMU 完成。MIPS 的虚拟地址被分为五部分，在初赛中根据
+比赛要求我们仅仅实现了 $kseg0$ 以及 $kseg1$ 这两部分的地址映射。后续设计会
+实现其余部分的映射。
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=.4\textwidth]{figures/VirtualAddress}
+    \caption{MIPS 虚拟内存映射}
+    \label{fig:VirtualAddress}
+\end{figure}
+
+\section{L1 Cache}
+
+设计缓存的目的是为了提高 CPU 的性能。我们的目标是在不影响频率的情况下，
+尽可能的设计出容量大、性能高的缓存。我们设计的 L1 Cache 有如下性质：
+
+\begin{enumerate}
+    \item 指令缓存与数据缓存分别实现
+    \item 数据缓存采用写回模式
+    \item Index 与 Tag 部分使用物理地址
+    \item 单个 Cache 行的大小为 64 字节，以尽可能支持 AXI 总线的猝发传输
+    \item 命中读在单周期内返回结果，命中写在一周期后完成
+\end{enumerate}
+
+我们实现的指令缓存与数据缓存大小均为 8KB，使用 Xilinx 提供的 Distrubuted 
+RAM IP 实现。在缓存中地址的功能分区如下:
+
+\begin{center}
+    \begin{bytefield}[endianness=big,bitwidth=1.1em]{32}
+        \bitheader{0-31} \\
+        \bitbox{19}{Tag} & \bitbox{7}{Index} & 
+        \bitbox{4}{Offset} & \bitbox{2}{$\phi$}\\
+    \end{bytefield}
+\end{center}
+
+\section{写缓冲}
+
+写缓冲用于加速 $kseg1$ 段的写操作。进行性能测试时抓取运行数据可以发现，
+由 printf 函数造成的向该段的写操作占据了绝大多数的访存时间，因此我们引入
+写缓冲来加速这一操作。
+
+写缓冲被实现为一个 16 项的 FIFO，保存有写入的地址、数据、字节使能等信息。对
+$kseg1$ 段的写操作都会暂存在该 FIFO 内，因此在 FIFO 未满时 $kseg1$ 段的
+写操作不会导致流水线暂停。当 FIFO 不为空时，访存单元会逐个处理还未完成的写
+操作。
+
+为了保证数据的一致性，任何对内存的读操作都会在写缓冲为空后才会执行。
 
 \bibliography{DesignReportRef}
 
