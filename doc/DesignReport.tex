@@ -618,11 +618,34 @@ RAM IP 实现。在缓存中地址的功能分区如下:
     \end{bytefield}
 \end{center}
 
+\subsection*{状态机}
+
+我们实现的指令缓存是由数据缓存裁剪后并加上双发射相关的代码实现的。因此在这一部分
+我们只介绍数据缓存的状态机。
+
+得益于 AXI 读写通道的分离，我们使用了两个状态机分别处理向内存设备的读操作以及写操作，以
+尽可能的提升性能。其状态转移简图见~\ref{fig:DCacheRead}~以及~\ref{fig:DCacheWrite}~。
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\textwidth]{figures/DCacheRead}
+    \caption{数据缓存读状态机}
+    \label{fig:DCacheRead}
+\end{figure}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\textwidth]{figures/DCacheWrite}
+    \caption{数据缓存写状态机}
+    \label{fig:DCacheWrite}
+\end{figure}
+
+
 \section{写缓冲}
 
 写缓冲用于加速 $kseg1$ 段的写操作。进行性能测试时抓取运行数据可以发现，
 由 printf 函数造成的向该段的写操作占据了绝大多数的访存时间，因此我们引入
-写缓冲来加速这一操作。
+写缓冲来减少访存造成的流水线暂停次数。
 
 写缓冲被实现为一个 16 项的 FIFO，保存有写入的地址、数据、字节使能等信息。对
 $kseg1$ 段的写操作都会暂存在该 FIFO 内，因此在 FIFO 未满时 $kseg1$ 段的
