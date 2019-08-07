@@ -53,17 +53,16 @@
 为了保证系统的简洁性，我们的 CPU 实现了最常用的部分 MIPS32 指令以及运行操作系统
 等高级应用所必须的协处理器 CP0 等。
 
-我们实现的处理器命名为 Sirius，采用了\textbf{双发射}五级流水线的设计\cite{Patterson:2013:COD:2568134}，并支持一级指令、数据
-缓存，以提升系统性能。一级缓存目前采用直接映射的方式，行宽 64 字节，大小为 8 KB。
+我们实现的处理器命名为 Sirius，采用了\textbf{双发射}五级流水线的设计\textsuperscript{\cite{Patterson:2013:COD:2568134}}，并支持一级指令、数据
+缓存，以提升系统性能。一级缓存采用直接映射的方式，行宽 64 字节，大小为 8 KB。
 
 通过运行功能测试以及性能测试，我们一定程度上证明了该处理器的正确性。
 
 \section{指令系统}
 
-根据大赛要求，我们实现的指令系统为 MIPS32\cite{MIPS1A}\cite{MIPS2A} 
-\cite{MIPS3} 指令系统的子集，准确的说，我们
-实现的指令系统包含全部 MIPS I 中的非浮点部分以及 MIPS32 中为了实现从异常
-返回而添加的 ERET 指令。该指令系统包含以下几种指令类型：
+根据大赛要求，我们实现的指令系统为 MIPS32r1 \textsuperscript{\cite{MIPS1A}\cite{MIPS2A} 
+\cite{MIPS3}} 指令系统的子集。准确的说，我们
+实现的指令系统包含除去浮点指令以及 branch-likely 指令外的完整 MIPS32r1 指令集。该指令系统包含以下几种指令类型：
 
 \begin{itemize}
     \item \textbf{算数运算指令}\ 包括 ADD、SUB、SLT、MULT、DIV 等指令
@@ -74,7 +73,7 @@
     \item \textbf{系统控制指令}\ 包括 SYSCALL、BREAK、MFC0、MTC0 等指令
 \end{itemize}
 
-大赛文档给出的 57 条指令，我们均已正常实现。CPU 中包含的 32 个通用寄存器，HI、LO寄存器，
+大赛文档要求的 57 条指令，我们均已正常实现。CPU 中包含的 32 个通用寄存器，HI、LO寄存器，
 以及协处理器(CP0) 中实现的寄存器均按照 MIPS32r1 的规范实现。
 
 基于性能方面的考虑，我们的 CPU 实现为非对称双发射五级流水线，通过对数据通路
@@ -84,10 +83,8 @@
 
 \section{内存管理}
 
-处理器的访存模块负责将虚地址映射为对应的物理地址，我们的 CPU 目前
-只实现了 MIPS32 规范中规定的 kseg0 以及 kseg1 两段内存地址的映射，这两部分
-的映射方式很简单。仅仅将物理地址的高三位置为 0 即可。后续的版本会实现完整的内存
-地址映射。
+处理器的 MMU 负责将虚地址映射为对应的物理地址。SiriusG 完整的支持了
+MIPS32r1 \textsuperscript{\cite{MIPS3}} 定义的虚地址转换方式。
 
 \section{缓存}
 
@@ -111,21 +108,28 @@ L1 Cache 对外采用 AXI 接口，支持猝发(Burst)传输，
 \begin{enumerate}
     \item \textbf{中断}\ 外部中断、软中断、计时器中断。是否触发中断
     由协处理器0中的 Cause.IP 和 Status.IM 两个字段共同决定。
-    \item \textbf{地址错例外：取指}\ 在取址阶段地址不对齐时触发该异常。
-    \item \textbf{保留指令例外}\ 在解码阶段发现该指令无法解码时触发该异常。
+    \item \textbf{地址错例外：取指}\ 在取指阶段地址不对齐或者出现权限错误时触发该异常。
+    \item \textbf{TLB Miss：取指}\ 取指阶段 TLB 未命中时触发该异常。
+    \item \textbf{TLB Invalid：取指}\ 取指阶段 TLB 无效时触发该异常。
     \item \textbf{自陷、系统调用}\ 当执行了对应的指令时触发这些异常。
+    \item \textbf{保留指令例外}\ 在解码阶段发现该指令无法解码时触发该异常。
+    \item \textbf{协处理器不可用}\ 当在非特权模式下执行特权指令时触发该异常。
     \item \textbf{整形溢出}\ 当执行 ADD、SUB、ADDI、SUBI 时发生溢出时触发该异常。
     \item \textbf{地址错例外：访存}\ 在访存阶段地址不对齐时触发该异常。
+    \item \textbf{TLB Miss：访存}\ 访存阶段 TLB 未命中时触发该异常。
+    \item \textbf{TLB Invalid：访存}\ 访存阶段 TLB 无效时触发该异常。
+    \item \textbf{TLB Modification}\ 访存阶段试图向不可写的页写入数据时触发该异常。
 \end{enumerate}
 
-异常发生后，PC 会被置为 0xBFC00380，开始异常处理流程。对于已经实现的异常，其处理流程
-遵循比赛要求的处理流程。中断会受到 CP0 寄存器的影响。Sirius 支持 6 个硬件中断，它们分别由 CP0 
-中的 Status.IM7 至 Status.IM2 位控制，对应位为 1 时中断启用。软中断则
+异常发生后，PC 会被置为相应的入口地址，开始异常处理流程。对于已经实现的异常，其处理流程
+遵循 MIPS32r1 规范要求的处理流程。中断会受到 CP0 寄存器的影响。Sirius 支持 5 个硬件中断以及
+一个计时器中断，
+它们分别由 CP0 中的 Status.IM7 至 Status.IM2 位控制，对应位为 1 时中断启用。软中断则
 由 Status.IM1 和 Status.IM0 控制。中断仅在处理器正常状态下才可以发生。
 
 \section{CP0}
 
-Sirius 实现了大赛文档要求的全部 CP0 寄存器。后续会补全支持 Linux 启动所必需的寄存器。
+Sirius 实现了 MIPS32r1 规范中要求的大部分寄存器，具体内容见附录。
 
 \chapter{CPU}
 
@@ -159,7 +163,7 @@ Sirius CPU 的流水线设计图见图~\ref{fig:SiriusPipeline}~。需要注意�
 这个设计图中，为了简化图片的复杂度，我们没有画出旁路、流水线控制以及流水寄存器
 等细节。
 
-CPU 部分的 RTL 代码使用 SyetemVerilog写就，核心代码除了乘除法部分
+CPU 部分的 RTL 代码使用 SyetemVerilog 编写，核心代码除了乘除法部分
 为了减少资源占用提升性能使用了 Xilinx 的 IP 核外，均为独立完成。代码
 存放于 \href{https://github.com/name1e5s/Sirius}{GitHub} 中。
 
@@ -280,7 +284,7 @@ PC 在初始化时被置为 0xBFC0\_0000。
 部分就是一个用于存储指令的环形缓冲区以及分别用于读写缓冲区的指针。在我们的实现中
 为了支持双发射相关的逻辑，我们拓展了读写指针，使得该指令 FIFO 最多可以同时
 读取和存储两条指令。同时为了支撑 MIPS 要求的延迟槽机制的正确运行，该 FIFO 还有
-还实现有一段区域用于在因分支指令清空 FIFO 时暂存延迟槽内的指令。
+还有一部分存储空间用于处理因分支指令清空 FIFO 时暂存在延迟槽内的指令。
 
 \begin{figure}[htpb]
     \centering
@@ -449,7 +453,7 @@ PC 在初始化时被置为 0xBFC0\_0000。
 等工作。
 
 大多数的简单的算术逻辑运算可以在 1 周期内完成，但是对于比较 DIV、MULT 等
-较为复杂的指令，需要 4 ~ 34 个周期来完成，此时就会阻塞流水线等待指令执行完毕。
+较为复杂的指令，需要 4 \textasciitilde\  34 个周期来完成，此时就会阻塞流水线等待指令执行完毕。
 不过好在多周期指令出现的频率极低，因此直接阻塞不会较大地对影响性能。
 
 我们的乘除法均使用 Xilinx\textsuperscript{\textregistered} 提供的 IP
@@ -548,7 +552,7 @@ ALU $\alpha$ 的代码位于 \href{https://github.com/name1e5s/Sirius/blob/maste
 
 HiLo 寄存器对外表现为一对寄存器，即 Hi、Lo 两个 32 位的寄存器。在我们的
 实现内，Hi、Lo 寄存器被作为一个整体实现，即实现为一个 64 位的寄存器。Hi 寄存器
-为这一寄存器的高 32 位，Lo 寄存器位该寄存器的低 32 位的寄存器。
+为这一寄存器的高 32 位，Lo 寄存器为该寄存器的低 32 位的寄存器。
 
 HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段以及写回阶段还未写入到
 寄存器内部的数值也可以被前推到执行阶段需要访问 HiLo 寄存器时候获得。
@@ -567,8 +571,7 @@ HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段
 
 在进行实际的访存指令之前，异常模块会先行检查是否存在异常，如果存在异常则
 取消当前的指令并把对应的 PC 值按照 MIPS 的规范放入 CP0 的 EPC 寄存器内，
-同时设置好处理异常所需的各个 CP0 寄存器。中断作为特殊的异常也会在此被处理，
-异常处理逻辑内存在对应的逻辑来处理异常可能会打断正常的流水线执行等问题。
+同时设置好处理异常所需的各个 CP0 寄存器。中断作为特殊的异常也会在此被处理。
 
 辅流水线在访存阶段什么都不做，仅仅是在未发生异常的情况下直接将所需信号
 传送到下一流水级等待处理。
@@ -600,7 +603,7 @@ MIPS 中的虚实地址转换由 MMU 完成。MIPS 的虚拟地址被分为五�
 尽可能的设计出容量大、性能高的缓存。我们设计的 L1 Cache 有如下性质：
 
 \begin{enumerate}
-    \item 指令缓存与数据缓存分别实现
+    \item 分离的指令缓存与数据缓存
     \item 数据缓存采用写回模式
     \item Index 与 Tag 部分使用物理地址
     \item 单个 Cache 行的大小为 64 字节，以尽可能支持 AXI 总线的猝发传输
@@ -628,14 +631,14 @@ RAM IP 实现。在缓存中地址的功能分区如下:
 
 \begin{figure}[htpb]
     \centering
-    \includegraphics[width=\textwidth]{figures/DCacheRead}
+    \includegraphics[width=.6\textwidth]{figures/DCacheRead}
     \caption{数据缓存读状态机}
     \label{fig:DCacheRead}
 \end{figure}
 
 \begin{figure}[htpb]
     \centering
-    \includegraphics[width=\textwidth]{figures/DCacheWrite}
+    \includegraphics[width=.6\textwidth]{figures/DCacheWrite}
     \caption{数据缓存写状态机}
     \label{fig:DCacheWrite}
 \end{figure}
@@ -643,17 +646,38 @@ RAM IP 实现。在缓存中地址的功能分区如下:
 
 \section{写缓冲}
 
-写缓冲用于加速 $kseg1$ 段的写操作。进行性能测试时抓取运行数据可以发现，
-由 printf 函数造成的向该段的写操作占据了绝大多数的访存时间，因此我们引入
+写缓冲用于加速向内存的写操作。进行性能测试时抓取运行数据可以发现，
+由 printf 函数造成的向内存的写操作占据了绝大多数的访存时间，因此我们引入
 写缓冲来减少访存造成的流水线暂停次数。
 
-写缓冲被实现为一个 16 项的 FIFO，保存有写入的地址、数据、字节使能等信息。对
-$kseg1$ 段的写操作都会暂存在该 FIFO 内，因此在 FIFO 未满时 $kseg1$ 段的
+写缓冲被实现为一个 16 项的 FIFO，保存有写入的地址、数据、字节使能等信息。
+任何写操作都会暂存在该 FIFO 内。在 FIFO 未满时向内存的
 写操作不会导致流水线暂停。当 FIFO 不为空时，访存单元会逐个处理还未完成的写
 操作。
 
 为了保证数据的一致性，任何对内存的读操作都会在写缓冲为空后才会执行。
 
+\chapter{系统软件}
+
+\section{SoC 介绍}
+为了验证 Sirius CPU 的设计，同时实现启动操作系统更好地完成演示，我们基于大赛提供的 \textbf{soc\_up} 环境
+搭建了包含如下外设的 SoC：
+\begin{enumerate}
+    \item cashi
+\end{enumerate}
+
+\section{PMON}
+
+\section{ucore}
+
+\appendix
+
+\chapter{Sirius 指令集}
+
+\chapter{CP0 寄存器列表}
+
+
 \bibliography{DesignReportRef}
+
 
 \end{document}
