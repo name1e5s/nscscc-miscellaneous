@@ -586,9 +586,11 @@ HiLo 寄存器内也实现了一个规模较小的旁路机制，即访存阶段
 访存单元主要包含两部分：用于虚实地址转换的 MMU 以及用于加速内存访问的 L1 Cache。
 
 \section{MMU}
-MIPS 中的虚实地址转换由 MMU 完成。MIPS 的虚拟地址被分为五部分，在初赛中根据
-比赛要求我们仅仅实现了 $kseg0$ 以及 $kseg1$ 这两部分的地址映射。后续设计会
-实现其余部分的映射。
+MIPS 中的虚实地址转换由 MMU 完成。MIPS 的虚拟地址被分为五部分。其中标号为 $kseg0$ 
+以及 $kseg1$ 的部分不需要经过 TLB 的映射，只需将前三位清零即可得到对应的物理地址。
+其他部分的地址则需要使用 TLB 进行查表转换。TLB 本质上为一块 CAM，对输入的地址
+以及 ASID 进行查表，输出对应的表项。TLB 的核心代码位于 \href{https://github.com/name1e5s/Sirius/blob/SiriusG/tlb\_common.sv}{tlb\_common} 
+模块中。
 
 \begin{figure}[htpb]
     \centering
@@ -596,6 +598,26 @@ MIPS 中的虚实地址转换由 MMU 完成。MIPS 的虚拟地址被分为五�
     \caption{MIPS 虚拟内存映射}
     \label{fig:VirtualAddress}
 \end{figure}
+
+
+TLB 为 8 项全相连接结构，每项均包含有效位、脏位、虚拟地址以及物理地址。
+转换时虚拟地址与 TLB 中的条目逐条比较，在找到虚拟地址匹配的条目后，
+返回其对应的物理地址以及该地址的状态信息，如果信息无效或者未找到对应的表项，
+会抛出对应的异常。为了简化设计，我们的 CPU 设计为固定 4K 页大小，
+所以虚拟地址的低 12 位直接成为物理地址的低 12 位，而高 20 位进入 TLB 进行查表操作。
+具体转换流程见图~\ref{fig:TLBTran}~。
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=.9\textwidth]{figures/TLBTran}
+    \caption{MIPS 虚拟内存映射}
+    \label{fig:TLBTran}
+\end{figure}
+
+为了保证性能， TLB 实际上存在 5 个实例，1 个为访存指令服务，其余 4 个
+为取指服务。在修改时 5 个实例同步修改，保证 TLB 的一致性。
+
+\newpage
 
 \section{L1 Cache}
 
@@ -661,14 +683,111 @@ RAM IP 实现。在缓存中地址的功能分区如下:
 
 \section{SoC 介绍}
 为了验证 Sirius CPU 的设计，同时实现启动操作系统更好地完成演示，我们基于大赛提供的 \textbf{soc\_up} 环境
-搭建了包含如下外设的 SoC：
+搭建了具有如下特性的 SoC：
 \begin{enumerate}
-    \item cashi
+    \item Sirius 双发射 CPU，8KB 指令 Cache， 8KB 数据 Cache
+    \item 支持板载 DDR3 SDRAM 内存
+    \item 支持从板载 SPI Flash 启动
+    \item 支持板载 NAND Flash
+    \item 兼容 16550 串口控制器
+    \item 100Mbps 以太网络通信
+    \item 可运行 uCore 操作系统
 \end{enumerate}
+
+\subsection{地址映射}
+
+SoC 中的地址映射由比赛提供的 \textbf{axi\_mux} 模块以及 \textbf{apb\_mux} 模块
+实现，地址映射见表~\ref{tab:SoCAddressMapping}~。
+
+\begin{table}
+    \renewcommand\arraystretch{1.25}
+    \centering
+    \begin{tabular}{cccc}
+        \toprule 
+        \rowcolor{black!20} \textbf{基址} & \textbf{长度} & \textbf{外设名称} & \textbf{接口类型} \\
+        \midrule
+        0x00000000 & 128MB & DDR3 SDRAM & 存储空间  \\
+        0x1fc00000 & 1MB & SPI Flash &  存储空间    \\
+        0x1fd00000 & 64KB & GPIO &  寄存器          \\
+        0x1fe40000 & 16KB & UART &  寄存器          \\
+        0x1fe78000 & 16KB & NAND Flash &  寄存器    \\
+        0x1fe80000 & 64KB & SPI Flash & 寄存器      \\
+        0xbff00000 & 64KB & MAC & 寄存器            \\
+        \bottomrule
+    \end{tabular}
+    \caption{SoC 地址映射}
+    \label{tab:SoCAddressMapping}
+\end{table}
+
+\subsection{中断连接}
+
+外设需要依靠中断机制通知 CPU，从而实现高效的 I/O 操作。
+MIPS 支持 8 个中断（编号 0 至 7），0、1 号中断为软件中断，
+最后一个保留给 CPU 内部的定时器，实际接到外设上的中断号为 2 至 6。连接关系见
+表~\ref{tab:SoCInt}~。
+
+\begin{table}
+    \renewcommand\arraystretch{1.25}
+    \centering
+    \begin{tabular}{cc}
+        \toprule 
+        \rowcolor{black!20} \textbf{中断号} & \textbf{来源} \\
+        \midrule
+        2 & 以太网控制器 \\
+        3 & UART 控制器 \\
+        4 & SPI Flash  \\
+        5 & NAND Flash \\
+        6 & NAND DMA   \\
+        \bottomrule
+    \end{tabular}
+    \caption{中断连接关系}
+    \label{tab:SoCInt}
+\end{table}
 
 \section{PMON}
 
+Sirius 使用的 PMON 是在大赛官方提供的 PMON 的基础上进行少许修改后
+得到的。主要改进是去除我们没有实现的指令。
+
+\subsection{开发环境}
+
+PMON 主要的开发环境为 GCC 的交叉编译工具集。我们使用的 GCC 为
+\href{https://mirrors.tuna.tsinghua.edu.cn/}{清华大学开源镜像站}
+上托管的 GCC 4.9。
+
+\subsection{构建方法}
+
+在设置好编译环境后，编译指令如下：
+
+\begin{lstlisting}[language=bash]
+	make cfg all tgt=rom CROSS_COMPILE=mipsel-linux- LANG=C
+\end{lstlisting}
+
+之后即可在 zloader 文件夹下找到最终生成的 \texttt{gzrom.bin} 文件。
+将之烧录到实验箱上的 SPI Flash 内即可启动。
+
 \section{ucore}
+
+Sirius 上的 ucore 是在大赛提供的源码上进行少许修改后得到的，主要的修改为
+修正留存的 BUG 以及使代码更加符合我们的硬件实际情况。主要修改如下：
+
+\begin{enumerate}
+    \item 在判断中断源时增加对 Status.IM 段的判断
+    \item 设置 TLB 的项数为 8
+    \item 将 \textbf{KMEMSIZE} 设置为内存的实际大小
+\end{enumerate}
+
+\subsection{构建方法}
+
+直接 \texttt{make} 即可。构建后得到 \texttt{ucore-kernel-initrd} 文件。
+将之通过串口或者网络加载进 PMON 即可启动 ucore。
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=.6\textwidth]{figures/ucore}
+    \caption{ucore 运行截图}
+    \label{fig:ucore}
+\end{figure}
 
 \appendix
 
