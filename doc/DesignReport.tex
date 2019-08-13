@@ -10,6 +10,7 @@
 \usepackage{tikz}
 \usepackage{titling}
 \usepackage{bytefield}
+\usepackage{longtable}
 \renewcommand\maketitlehooka{\null\mbox{}\vfill}
 \renewcommand\maketitlehookd{\vfill\null}
 
@@ -129,7 +130,7 @@ L1 Cache 对外采用 AXI 接口，支持猝发(Burst)传输，
 
 \section{CP0}
 
-Sirius 实现了 MIPS32r1 规范中要求的大部分寄存器，具体内容见附录。
+Sirius 实现了 MIPS32r1 规范中要求的大部分寄存器，具体内容见附录 B。
 
 \chapter{CPU}
 
@@ -757,7 +758,7 @@ PMON 主要的开发环境为 GCC 的交叉编译工具集。我们使用的 GCC
 
 \subsection{构建方法}
 
-在设置好编译环境后，编译指令如下：
+在设置好编译环境后，使用如下指令进行编译：
 
 \begin{lstlisting}[language=bash]
 	make cfg all tgt=rom CROSS_COMPILE=mipsel-linux- LANG=C
@@ -791,10 +792,154 @@ Sirius 上的 ucore 是在大赛提供的源码上进行少许修改后得到的
 
 \appendix
 
-\chapter{Sirius 指令集}
+\chapter{}
+\section{Sirius 指令集}
 
-\chapter{CP0 寄存器列表}
+本章列出 Sirius 中支持的全部指令，其中浅绿色的为与大赛要求实现的指令相比
+Sirius 新增的指令。指令描述来自\cite{MIPS2A}。
 
+\begin{longtable}[c]{| c | l |}
+    \caption{Sirius 指令集\label{long}}\\
+    
+    \hline
+    Mnemonic & Description\\
+    \hline
+    \endfirsthead
+    
+    \hline
+    \multicolumn{2}{|c|}{续表 \ref{long}}\\
+    \hline
+    Mnemonic  & Description\\
+    \hline
+    \endhead
+    
+    \hline
+    \endfoot
+    
+    \hline
+    \hline
+    \endlastfoot
+    
+    ADD & Add Word \\
+    ADDI & Add Immediate Word \\
+    ADDIU & Add Immetiade Add Immediate Unsigned Word \\
+    ADDU & Add Unsigned Word \\
+    AND & And \\
+    ANDI & And Immediate \\
+    B & Unconditional Branch \\
+    BAL & Branch and Link \\
+    BEQ & Branch on Equal \\
+    BGEZ & Branch on Greater Than or Equal to Zero \\
+    BGEZAL & Branch on Greater Than or Equal to Zero and Link \\
+    BGTZ & Branch on Greater Than Zero \\
+    BLEZ & Branch on Less Than or Equal to Zero \\
+    BLTZ & Branch on Less Than Zero \\
+    BLTZAL & Branch on Less Than Zero and Link \\
+    BNE & Branch on Not Equal \\
+    BREAK & Breakpoint \\
+    \rowcolor{green!20} CACHE & Perform Cache Operation \\
+    \rowcolor{green!20} CLO & Count Leading Ones in Word \\
+    \rowcolor{green!20} CLZ & Count Leading Zeros in Word \\
+    DIV & Divide Word \\
+    DIVU & Divide Unsigned Word \\
+    ERET & Exception Return \\
+    J & Jump \\
+    JAL & Jump and Link \\
+    JALR & Jump and Link Register \\
+    JR & Jump Register \\
+    LB & Load Byte \\
+    LBU & Load Byte Unsigned \\
+    LH & Load Halfword \\
+    LHU & Load Halfword Unsigned \\
+    LUI & Load Upper Immediate \\
+    LW & Load Word \\
+    \rowcolor{green!20} LWL & Load Word Left \\
+    \rowcolor{green!20} LWR & Load Word Right \\
+    \rowcolor{green!20} MADD & Multiply and Add Word to Hi,Lo \\
+    \rowcolor{green!20} MADDU & Multiply and Add Unsigned Word to Hi,Lo \\
+    MFC0 & Move from Coprocessor 0 \\
+    MFHI & Move From HI Register \\
+    MFLO & Move From LO Register \\
+    \rowcolor{green!20} MOVN & Move Conditional on Not Zero \\
+    \rowcolor{green!20} MOVZ & Move Conditional on Zero \\
+    \rowcolor{green!20} MSUB & Multiply and Subtract Word to Hi,Lo \\
+    \rowcolor{green!20} MSUBU & Multiply and Subtract Word to Hi,Lo \\
+    MTC0 & Move to Coprocessor 0 \\
+    MTHI & Move to HI Register \\
+    MTLO & Move to LO Register \\
+    \rowcolor{green!20} MUL & Multiply Word to GPR \\
+    MULT & Multiply Word \\
+    MULTU & Multiply Unsigned Word \\
+    NOP & No Operation(Assembly Idiom) \\
+    NOR & Not Or \\
+    OR & Or \\
+    ORI & Or Immediate \\
+    SB & Store Byte \\
+    SH & Store Halfword \\
+    SLL & Shift Word Left Logical \\
+    SLLV & Shift Word Left Logical Variable \\
+    SLT & Set on Less Than \\
+    SLTI & Set on Less Than Immediate \\
+    SLTIU & Set on Less Than Immediate Unsigned \\
+    SLTU & Set on Less Than Unsigned \\
+    SRA & Shift Word Right Arithmetic \\
+    SRAV & Shift Word Right Arithmetic Variable \\
+    SRL & Shift Word Right Logical \\
+    SRLV & Shift Word Right Logical Variable \\
+    SSNOP & Superscalar No Operation(Pseudo instruction) \\
+    SUB & Subtract Word \\
+    SUBU & Subtract Unsigned Word \\
+    SW & Store Word \\
+    \rowcolor{green!20} SWL & Store Word Left \\
+    \rowcolor{green!20} SWR & Store Word Right \\
+    \rowcolor{green!20} SYNC & Synchronize Shared Memory \\
+    SYSCALL & System Call \\
+    \rowcolor{green!20} TLBP & Probe TLB for Matching Entry \\
+    \rowcolor{green!20} TLBR & Read Indexed TLB Entry \\
+    \rowcolor{green!20} TLBWI & Write Indexed TLB Entry \\
+    \rowcolor{green!20} TLBWR & Write Random TLB Entry \\
+    \rowcolor{green!20} WAIT & Enter Standby Mode \\
+    XOR & Exclusive OR \\
+    XORI & Exclusive OR Immediate \\
+    \end{longtable}
+
+\section{CP0 寄存器列表}
+本章列出 Sirius 处理器支持的全部 CP0 寄存器列表，其中浅绿色的为与大赛要求实现的寄存器相比
+ Sirius 新增的寄存器。寄存器描述来自\cite{MIPS3}。
+
+\begin{table}
+    \renewcommand\arraystretch{1.25}
+    \centering
+    \begin{tabular}{cclm{.55\textwidth}}
+        \toprule 
+        \rowcolor{black!20} \textbf{Register Number} & \textbf{Select} & \textbf{Name} & \textbf{Function} \\
+        \midrule
+        \rowcolor{green!20} 0 & 0 & Index & Index into the TLB array \\
+        \rowcolor{green!20} 1 & 0 & Ramdom & Randomly generated index into the TLB array \\
+        \rowcolor{green!20} 2 & 0 & EntryLo0 & Low-order portion of the TLB entry for
+        even-numbered virtual pages \\
+        \rowcolor{green!20} 3 & 0 & EntryLo1 & Low-order portion of the TLB entry for
+        odd-numbered virtual pages \\
+        \rowcolor{green!20} 4 & 0 & Context & Pointer to page table entry in memory \\
+        \rowcolor{green!20} 6 & 0 & Wired & Controls the number of fixed (“wired”) TLB
+        entries \\
+        \rowcolor{cyan!20} 8 & 0 & BadVAddr & Reports the address for the most recent
+        address-related exception \\
+        \rowcolor{cyan!20} 9 & 0 & Count & Processor cycle count \\
+        \rowcolor{green!20} 10 & 0 & EntryHi & High-order portion of the TLB entry \\
+        \rowcolor{cyan!20} 11 & 0 & Compare & Timer interrupt control \\
+        \rowcolor{cyan!20} 12 & 0 & Status &  Processor status and control \\
+        \rowcolor{cyan!20} 13 & 0 & Cause & Cause of last general exception \\
+        \rowcolor{cyan!20} 14 & 0 & EPC & Program counter at last exception \\
+        \rowcolor{green!20} 15 & 0 & PRId & Processor identification and revision \\
+        \rowcolor{green!20} 16 & 0 & Config &  Configuration register \\
+        \rowcolor{green!20} 16 & 1 & Config1 & Configuration register 1 \\
+
+        \bottomrule
+    \end{tabular}
+    \caption{CP0 寄存器列表}
+    \label{tab:SiriusCP0}
+\end{table}
 
 \bibliography{DesignReportRef}
 
