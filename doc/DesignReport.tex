@@ -63,7 +63,8 @@
 
 根据大赛要求，我们实现的指令系统为 MIPS32r1 \textsuperscript{\cite{MIPS1A}\cite{MIPS2A} 
 \cite{MIPS3}} 指令系统的子集。准确的说，我们
-实现的指令系统包含除去浮点指令以及 branch-likely 指令外的完整 MIPS32r1 指令集。该指令系统包含以下几种指令类型：
+实现的指令系统包含除去浮点指令以及 branch-likely 指令外的完整 MIPS32r1 指令集，
+全部指令列表详见附录~\ref{section:ISA}~。该指令系统包含以下几种指令类型：
 
 \begin{itemize}
     \item \textbf{算数运算指令}\ 包括 ADD、SUB、SLT、MULT、DIV 等指令
@@ -74,7 +75,7 @@
     \item \textbf{系统控制指令}\ 包括 SYSCALL、BREAK、MFC0、MTC0 等指令
 \end{itemize}
 
-大赛文档要求的 57 条指令，我们均已正常实现。CPU 中包含的 32 个通用寄存器，HI、LO寄存器，
+CPU 中包含的 32 个通用寄存器，HI、LO寄存器，
 以及协处理器(CP0) 中实现的寄存器均按照 MIPS32r1 的规范实现。
 
 基于性能方面的考虑，我们的 CPU 实现为非对称双发射五级流水线，通过对数据通路
@@ -130,7 +131,7 @@ L1 Cache 对外采用 AXI 接口，支持猝发(Burst)传输，
 
 \section{CP0}
 
-Sirius 实现了 MIPS32r1 规范中要求的大部分寄存器，具体内容见附录 B。
+Sirius 实现了 MIPS32r1 规范中要求的大部分寄存器，具体内容见附录 ~\ref{section:CP0}~。
 
 \chapter{CPU}
 
@@ -793,7 +794,7 @@ Sirius 上的 ucore 是在大赛提供的源码上进行少许修改后得到的
 \appendix
 
 \chapter{}
-\section{Sirius 指令集}
+\section{Sirius 指令集} \label{section:ISA}
 
 本章列出 Sirius 中支持的全部指令，其中浅绿色的为与大赛要求实现的指令相比
 Sirius 新增的指令。指令描述来自\cite{MIPS2A}。
@@ -903,7 +904,7 @@ Sirius 新增的指令。指令描述来自\cite{MIPS2A}。
     XORI & Exclusive OR Immediate \\
     \end{longtable}
 
-\section{CP0 寄存器列表}
+\section{CP0 寄存器列表} \label{section:CP0}
 本章列出 Sirius 处理器支持的全部 CP0 寄存器列表，其中浅绿色的为与大赛要求实现的寄存器相比
  Sirius 新增的寄存器。寄存器描述来自\cite{MIPS3}。
 
